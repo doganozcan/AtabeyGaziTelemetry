@@ -214,42 +214,42 @@ namespace telemetry
         }
 		
         private void bt_connect_Click(object sender, EventArgs e) {
-            // FAKEDATA CONNECT
-            //try
-            //{
-            //    if (bt_connect.ImageLocation == getImage("connect")) //BAĞLAN
-            //    {
-            //        if (!tm_fakeData.Enabled)
-            //        {
-            //            bt_connect.ImageLocation = getImage("disconnect");
-            //            alert.Show("Bağlantı başarıyla kuruldu.", "success");
-            //            fakeDist = 0;                      
-            //            if (!FirstDataReceived)
-            //            {             
-            //                FirstDataReceived = true;
-            //                StartDate = DateTime.Now;
-            //            }
-            //            tm_fakeData.Enabled = true;
-            //            bt_refresh.Enabled = cb_ports.Enabled = cb_baudRate.Enabled = false;                 
-            //        }
-            //    }
-            //    else //BAĞLANTIYI KES
-            //    {
-            //        bt_connect.ImageLocation = getImage("connect");
-            //        alert.Show("Bağlantı kesildi.", "danger");
-            //        if (tm_fakeData.Enabled) tm_fakeData.Enabled = false;
-            //        bt_refresh.Enabled = cb_ports.Enabled = cb_baudRate.Enabled = true;
-            //    }
-            //}
-            //catch (Exception x)
-            //{
-            //    bt_connect.ImageLocation = getImage("connect");
-            //    alert.Show(x.Message, "danger");
-            //    if (tm_fakeData.Enabled) tm_fakeData.Enabled = false;
-            //    bt_refresh.Enabled = cb_ports.Enabled = cb_baudRate.Enabled = true;
-            //}
-            // FAKEDATA CONNECT END
-
+            //FAKEDATA CONNECT
+            try
+            {
+                if (bt_connect.ImageLocation == getImage("connect")) //BAĞLAN
+                {
+                    if (!tm_fakeData.Enabled)
+                    {
+                        bt_connect.ImageLocation = getImage("disconnect");
+                        alert.Show("Bağlantı başarıyla kuruldu.", "success");
+                        fakeDist = 0;
+                        if (!FirstDataReceived)
+                        {
+                            FirstDataReceived = true;
+                            StartDate = DateTime.Now;
+                        }
+                        tm_fakeData.Enabled = true;
+                        bt_refresh.Enabled = cb_ports.Enabled = cb_baudRate.Enabled = false;
+                    }
+                }
+                else //BAĞLANTIYI KES
+                {
+                    bt_connect.ImageLocation = getImage("connect");
+                    alert.Show("Bağlantı kesildi.", "danger");
+                    if (tm_fakeData.Enabled) tm_fakeData.Enabled = false;
+                    bt_refresh.Enabled = cb_ports.Enabled = cb_baudRate.Enabled = true;
+                }
+            }
+            catch (Exception x)
+            {
+                bt_connect.ImageLocation = getImage("connect");
+                alert.Show(x.Message, "danger");
+                if (tm_fakeData.Enabled) tm_fakeData.Enabled = false;
+                bt_refresh.Enabled = cb_ports.Enabled = cb_baudRate.Enabled = true;
+            }
+            //FAKEDATA CONNECT END
+            return;
             try
             {
                 if (bt_connect.ImageLocation == getImage("connect")) //BAĞLAN
@@ -281,7 +281,9 @@ namespace telemetry
             }
         }
 
-        private void serialPort1_DataReceived(object sender, SerialDataReceivedEventArgs e) {
+        // ESKİ KOD. ALTTAKİNİ DENE Bİ.
+        private void serialPort1_DataReceivedOLD(object sender, SerialDataReceivedEventArgs e)
+        {
             try
             {
                 // TODO: DEĞERLER EKSİ GELDİĞİNDE GÖSTERMESİN.
@@ -328,8 +330,98 @@ namespace telemetry
                 lb_watt.Text = watt.ToString();
 
                 for (int i = 0; i < cellCount; i++)
-                {                 
+                {
                     if (json.ContainsKey("voltages" + i)) batteryCells[i].Value(Convert.ToDouble(json["voltages" + i].Replace(".", ",")));
+                }
+
+                // LOG KAYITLARI
+                int timePassed = (int)Math.Round((DateTime.Now - StartDate).TotalMilliseconds);
+
+                string TubitakLog = timePassed + "," + speed + "," + (tempAv * 100) + "," + (totalVoltage * 100) + "," + watt + "\r\n";
+
+                string log = "Akım: " + current + " A" +
+                             "\r\nToplam Gerilim: " + totalVoltage + " V, En Düşük: " + minVoltage + " V, En Yüksek: " + maxVoltage + " V" +
+                             "\r\nHücre Gerilimleri: ";
+                for (int i = 0; i < 26; i++)
+                {
+                    if (i % 7 == 0) log += "\r\n";
+                    if (json.ContainsKey("voltages" + i))
+                    {
+                        log += (i + 1).ToString() + ") " + json["voltages" + i] + " V";
+                        if (i != 25) log += ", ";
+                    }
+                }
+                log += "\r\nGüç: " + watt + " W" +
+                       "\r\nMotor Sıcaklığı: " + engineTemp + " °C" +
+                       "\r\n1.Sıcaklık: " + temp1 + " °C, 2.Sıcaklık: " + temp2 + " °C, 3.Sıcaklık: " + temp3 + " °C, 4.Sıcaklık: " + temp4 + " °C" +
+                       "\r\nOrtalama Sıcaklık: " + tempAv + " °C" +
+                       "\r\nHız: " + speed + " km/s" +
+                       "\r\nBatarya Şarjı: " + battery + " %" +
+                       "\r\nTarih: " + DateTime.Now + "\r\n\r\n";
+                tb_logs.AppendText(log);
+                //tb_logs.AppendText(TubitakLog);
+                if (Setting.GetSettings("saveLogsAuto"))
+                {
+                    Logger.SaveTubitakLogs(log: TubitakLog, date: StartDate);
+                    Logger.SaveLogs(log);
+                }
+            }
+            catch (Exception x)
+            {
+                //Debug.WriteLine(x.StackTrace);
+                alert.Show(x.Message, "danger");
+            }
+        }
+
+        private void serialPort1_DataReceived(object sender, SerialDataReceivedEventArgs e) {
+            try
+            {
+                // TODO: DEĞERLER EKSİ GELDİĞİNDE GÖSTERMESİN.
+                //Debug.WriteLine(serialPort1.ReadLine());
+                var json = JsonConvert.DeserializeObject<Dictionary<string, dynamic>>(serialPort1.ReadLine());
+                if (json.ContainsKey("current")) current = json["current"];
+                if (json.ContainsKey("battery")) battery = json["battery"];
+                if (json.ContainsKey("speed")) speed = (int)json["speed"];
+                if (json.ContainsKey("temp1")) temp1 = json["temp1"];
+                if (json.ContainsKey("temp2")) temp2 = json["temp2"];
+                if (json.ContainsKey("temp3")) temp3 = json["temp3"];
+                if (json.ContainsKey("temp4")) temp4 = json["temp4"];
+                if (json.ContainsKey("tempAv")) tempAv = json["tempAv"];
+                if (json.ContainsKey("totalVoltage")) totalVoltage = json["totalVoltage"];
+                if (json.ContainsKey("minVoltage")) minVoltage = json["minVoltage"];
+                if (json.ContainsKey("maxVoltage")) maxVoltage = json["maxVoltage"];
+                if (json.ContainsKey("engineTemp")) engineTemp = json["engineTemp"];
+                if (json.ContainsKey("watt")) watt = (int)json["watt"];
+                if (json.ContainsKey("distance")) distance = (int)json["distance"];
+
+                if (current < 0) { current = 0.0; }
+
+                dataCount++;
+                TotalWatt += watt;
+                AverageWatt = (int)Math.Round((double)TotalWatt / dataCount);
+
+                lb_current.Text = current + "A";
+                lb_temp.Text = tempAv + "°C";
+                setColorByTemp(tempAv, lb_temp);
+                setColorByTemp(engineTemp, lb_engine);
+                lb_engine.Text = engineTemp + "°C";
+                lb_speed.Text = speed.ToString();
+                lb_battery.Text = battery + "%";
+                lb_totalVoltage.Text(totalVoltage.ToString(), "Toplam Gerilim: ");
+
+                lb_minVoltage.Text(minVoltage.ToString(), "En Düşük: ");
+                lb_maxVoltage.Text(maxVoltage.ToString(), "En Yüksek: ");
+                lb_temp1.Text(temp1.ToString(), "BT1: ", color: true);
+                lb_temp2.Text(temp2.ToString(), "BT2: ", color: true);
+                lb_temp3.Text(temp3.ToString(), "BT3: ", color: true);
+                lb_temp4.Text(temp4.ToString(), "BT4: ", color: true);
+
+                lb_voltage.Text = totalVoltage.ToString();
+                lb_watt.Text = watt.ToString();
+
+                for (int i = 0; i < cellCount; i++)
+                {
+                    if (json.ContainsKey("voltages" + i)) batteryCells[i].Value(json["voltages" + i]);
                 }
 
                 // LOG KAYITLARI
@@ -388,7 +480,7 @@ namespace telemetry
                     "'voltages14': 3.4, 'voltages15': 3.4, 'voltages16': 3.4, " +
                     "'voltages17': 3.4, 'voltages18': 3.4, 'voltages19': 3.4, 'voltages20': 3.4, " +
                     "'voltages21': 3.4, 'voltages22': 3.4, 'voltages23': 3.4, " +
-                    "'voltages24': 3.4, 'voltages25': 3.4, 'distance': "+ fakeDist+"}"); 
+                    "'voltages24': 3.4, 'voltages25': 3.4, 'distance': "+ fakeDist+"}");
                 if (json.ContainsKey("current")) current = json["current"];
                 if (json.ContainsKey("battery")) battery = json["battery"];
                 if (json.ContainsKey("speed")) speed = (int)json["speed"];
@@ -433,8 +525,10 @@ namespace telemetry
                 {
                     if (json.ContainsKey("voltages" + i)) batteryCells[i].Value(json["voltages" + i]);
                 }
-                int timePassed = (int)Math.Round((DateTime.Now - StartDate).TotalMilliseconds);
+
                 // LOG KAYITLARI
+                int timePassed = (int)Math.Round((DateTime.Now - StartDate).TotalMilliseconds);
+
                 string TubitakLog = timePassed + "," + speed + "," + (tempAv * 100) + "," + (totalVoltage * 100) + "," + watt + "\r\n";
 
                 string log = "Akım: " + current + " A" +
